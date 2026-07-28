@@ -16,8 +16,8 @@ class App {
 
   private currentTool: ToolType = 'brush';
   private currentColor = '#f8fafc';
-  private currentFillColor = 'transparent';
-  private currentFillStyle: FillStyleOption = 'none';
+  private currentFillColor = '#3b82f6';
+  private currentFillStyle: FillStyleOption = 'solid';
   private currentDashStyle: DashStyleOption = 'solid';
   private currentSloppiness: SloppinessLevel = 'artist';
   private currentSize = 3;
@@ -129,11 +129,22 @@ class App {
         fillSwatches.forEach((s) => s.classList.remove('active'));
         const target = e.currentTarget as HTMLElement;
         target.classList.add('active');
-        this.currentFillColor = target.dataset.fill || 'transparent';
+        const color = target.dataset.fill || 'transparent';
+        this.currentFillColor = color;
+
+        if (color === 'transparent') {
+          this.currentFillStyle = 'none';
+          this.updateFillStyleSegmentedUI('none');
+        } else {
+          if (this.currentFillStyle === 'none') {
+            this.currentFillStyle = 'solid';
+          }
+          this.updateFillStyleSegmentedUI(this.currentFillStyle);
+        }
       });
     });
 
-    // Segmented Controls (Fill Style, Sloppiness, Dash Style)
+    // Segmented Controls
     this.bindSegmentedControl('data-fill-style', (val) => {
       this.currentFillStyle = val as FillStyleOption;
     });
@@ -198,6 +209,18 @@ class App {
     document.getElementById('redo-btn')?.addEventListener('click', () => this.redo());
     document.getElementById('clear-btn')?.addEventListener('click', () => this.clearCanvas());
     document.getElementById('save-btn')?.addEventListener('click', () => this.canvasManager.exportPNG());
+  }
+
+  private updateFillStyleSegmentedUI(style: FillStyleOption): void {
+    const buttons = document.querySelectorAll('[data-fill-style]');
+    buttons.forEach((btn) => {
+      const el = btn as HTMLElement;
+      if (el.getAttribute('data-fill-style') === style) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
   }
 
   private bindSegmentedControl(attribute: string, onChange: (val: string) => void): void {
@@ -385,7 +408,6 @@ class App {
       const screenPt = this.getScreenPoint(e);
       const worldPt = this.viewportManager.screenToWorld(screenPt.x, screenPt.y);
 
-      // Handle Viewport Pan
       if (this.isPanning) {
         const deltaX = e.clientX - this.lastPanPoint.x;
         const deltaY = e.clientY - this.lastPanPoint.y;
@@ -394,7 +416,6 @@ class App {
         return;
       }
 
-      // Handle Action Move
       if (this.isMovingAction && this.selectedAction) {
         const deltaX = worldPt.x - this.moveStartPoint.x;
         const deltaY = worldPt.y - this.moveStartPoint.y;
@@ -416,7 +437,6 @@ class App {
         return;
       }
 
-      // Send cursor position in world space
       this.sendCursorPosition(worldPt);
 
       if (this.isDrawing) {

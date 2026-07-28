@@ -54,7 +54,6 @@ export class SketchRenderer {
       const offsetX2 = (Math.random() - 0.5) * mult * 2;
       const offsetY2 = (Math.random() - 0.5) * mult * 2;
 
-      // Midpoint jitter
       const midX = (x1 + x2) / 2 + (Math.random() - 0.5) * mult * 3;
       const midY = (y1 + y2) / 2 + (Math.random() - 0.5) * mult * 3;
 
@@ -80,18 +79,21 @@ export class SketchRenderer {
     sloppiness: SloppinessLevel = 'artist',
     dashStyle: DashStyleOption = 'solid'
   ): void {
+    const rx = Math.min(x, x + w);
+    const ry = Math.min(y, y + h);
+    const rw = Math.abs(w);
+    const rh = Math.abs(h);
+
     ctx.save();
 
-    // Render fill pattern
     if (fillStyle !== 'none' && fillColor && fillColor !== 'transparent') {
-      this.drawFillPattern(ctx, x, y, w, h, fillColor, fillStyle);
+      this.drawFillPattern(ctx, rx, ry, rw, rh, fillColor, fillStyle);
     }
 
-    // Hand-drawn double strokes for rectangle sides
-    this.drawSketchyLine(ctx, x, y, x + w, y, color, width, sloppiness, dashStyle);
-    this.drawSketchyLine(ctx, x + w, y, x + w, y + h, color, width, sloppiness, dashStyle);
-    this.drawSketchyLine(ctx, x + w, y + h, x, y + h, color, width, sloppiness, dashStyle);
-    this.drawSketchyLine(ctx, x, y + h, x, y, color, width, sloppiness, dashStyle);
+    this.drawSketchyLine(ctx, rx, ry, rx + rw, ry, color, width, sloppiness, dashStyle);
+    this.drawSketchyLine(ctx, rx + rw, ry, rx + rw, ry + rh, color, width, sloppiness, dashStyle);
+    this.drawSketchyLine(ctx, rx + rw, ry + rh, rx, ry + rh, color, width, sloppiness, dashStyle);
+    this.drawSketchyLine(ctx, rx, ry + rh, rx, ry, color, width, sloppiness, dashStyle);
 
     ctx.restore();
   }
@@ -109,19 +111,25 @@ export class SketchRenderer {
     dashStyle: DashStyleOption = 'solid'
   ): void {
     ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    this.applyDashStyle(ctx, dashStyle, width);
 
-    // Render Fill
     if (fillStyle !== 'none' && fillColor && fillColor !== 'transparent') {
+      ctx.save();
       ctx.fillStyle = fillColor;
       ctx.beginPath();
       ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.fill();
+
+      if (fillStyle === 'hatch' || fillStyle === 'cross-hatch') {
+        ctx.clip();
+        this.drawFillPattern(ctx, cx - radius, cy - radius, radius * 2, radius * 2, fillColor, fillStyle);
+      }
+      ctx.restore();
     }
 
-    // Multi-pass sketchy circle loops
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    this.applyDashStyle(ctx, dashStyle, width);
+
     const mult = this.getJitterMultiplier(sloppiness);
     const passes = sloppiness === 'architect' ? 1 : 2;
 
@@ -155,10 +163,15 @@ export class SketchRenderer {
     sloppiness: SloppinessLevel = 'artist',
     dashStyle: DashStyleOption = 'solid'
   ): void {
-    const top = { x: x + w / 2, y };
-    const right = { x: x + w, y: y + h / 2 };
-    const bottom = { x: x + w / 2, y: y + h };
-    const left = { x, y: y + h / 2 };
+    const rx = Math.min(x, x + w);
+    const ry = Math.min(y, y + h);
+    const rw = Math.abs(w);
+    const rh = Math.abs(h);
+
+    const top = { x: rx + rw / 2, y: ry };
+    const right = { x: rx + rw, y: ry + rh / 2 };
+    const bottom = { x: rx + rw / 2, y: ry + rh };
+    const left = { x: rx, y: ry + rh / 2 };
 
     if (fillStyle !== 'none' && fillColor && fillColor !== 'transparent') {
       ctx.save();
@@ -170,6 +183,11 @@ export class SketchRenderer {
       ctx.lineTo(left.x, left.y);
       ctx.closePath();
       ctx.fill();
+
+      if (fillStyle === 'hatch' || fillStyle === 'cross-hatch') {
+        ctx.clip();
+        this.drawFillPattern(ctx, rx, ry, rw, rh, fillColor, fillStyle);
+      }
       ctx.restore();
     }
 
@@ -191,7 +209,6 @@ export class SketchRenderer {
   ): void {
     this.drawSketchyLine(ctx, x1, y1, x2, y2, color, width, sloppiness);
 
-    // Calculate Arrowhead angle & wings
     const angle = Math.atan2(y2 - y1, x2 - x1);
     const headLength = Math.max(12, width * 3);
 
@@ -215,25 +232,21 @@ export class SketchRenderer {
     text: string
   ): void {
     ctx.save();
-    // Sticky note shadow
+
     ctx.fillStyle = 'rgba(0,0,0,0.15)';
     ctx.fillRect(x + 4, y + 4, w, h);
 
-    // Sticky note paper
-    ctx.fillStyle = bgColor || '#fef08a'; // Pastel yellow default
+    ctx.fillStyle = bgColor || '#fef08a';
     ctx.fillRect(x, y, w, h);
 
-    // Draw sketchy note border
     this.drawSketchyRect(ctx, x, y, w, h, 'rgba(0,0,0,0.2)', 'transparent', 2, 'none', 'architect');
 
-    // Sticky note text
     if (text) {
       ctx.fillStyle = '#1e293b';
       ctx.font = '500 14px Inter, sans-serif';
       ctx.textAlign = 'start';
       ctx.textBaseline = 'top';
 
-      // Wrap text inside note box
       const padding = 12;
       const maxWidth = w - padding * 2;
       const words = text.split(' ');
@@ -267,18 +280,18 @@ export class SketchRenderer {
     fillStyle: FillStyleOption
   ): void {
     ctx.save();
-    ctx.fillStyle = color;
 
     if (fillStyle === 'solid') {
+      ctx.fillStyle = color;
       ctx.fillRect(x, y, w, h);
     } else if (fillStyle === 'hatch' || fillStyle === 'cross-hatch') {
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.6;
 
-      const spacing = 10;
+      const spacing = 12;
       ctx.beginPath();
-      for (let i = -h; i < w; i += spacing) {
+      for (let i = -h; i < w + h; i += spacing) {
         ctx.moveTo(x + i, y);
         ctx.lineTo(x + i + h, y + h);
       }
@@ -286,9 +299,9 @@ export class SketchRenderer {
 
       if (fillStyle === 'cross-hatch') {
         ctx.beginPath();
-        for (let i = 0; i < w + h; i += spacing) {
-          ctx.moveTo(x + i, y);
-          ctx.lineTo(x + i - h, y + h);
+        for (let i = -h; i < w + h; i += spacing) {
+          ctx.moveTo(x + i, y + h);
+          ctx.lineTo(x + i + h, y);
         }
         ctx.stroke();
       }
