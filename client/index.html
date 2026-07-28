@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Collaborative Canvas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Top Header Bar -->
+    <header class="top-bar glass">
+      <div class="brand">
+        <div class="logo-icon">🎨</div>
+        <div class="logo-text">
+          <h1>CollabCanvas</h1>
+          <span class="badge">Real-Time</span>
+        </div>
+      </div>
+
+      <!-- Room Controls -->
+      <div class="room-container">
+        <label for="room-input" class="room-label">Room:</label>
+        <div class="room-input-group">
+          <input type="text" id="room-input" value="default" placeholder="Enter room name..." />
+          <button id="join-room-btn" class="btn btn-secondary">Join</button>
+          <button id="share-room-btn" class="btn btn-icon" title="Copy Room Link">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+              <polyline points="16 6 12 2 8 6"></polyline>
+              <line x1="12" y1="2" x2="12" y2="15"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Online Users & Status -->
+      <div class="status-container">
+        <div id="user-badge" class="user-profile-badge">
+          <span id="user-avatar" class="avatar-dot"></span>
+          <span id="user-name" class="user-name">Connecting...</span>
+        </div>
+
+        <div class="online-users-wrapper" title="Online Collaborators">
+          <div id="online-users-list" class="online-avatars"></div>
+          <span id="online-count" class="online-count-badge">0 online</span>
+        </div>
+
+        <!-- Performance Stats -->
+        <div class="metrics-pill">
+          <span id="fps-display">60 FPS</span>
+          <span class="divider">|</span>
+          <span id="ping-display">-- ms</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+      <!-- Floating Toolbar -->
+      <aside class="toolbar glass">
+        <!-- Tools Selection -->
+        <div class="tool-group">
+          <button class="tool-btn active" data-tool="brush" title="Brush (B)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 11l-5-5L13 2H7L2 7v6l4 4 5 5h6v-6z"></path>
+              <path d="M18 11l-5-5"></path>
+            </svg>
+          </button>
+          <button class="tool-btn" data-tool="eraser" title="Eraser (E)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"></path>
+              <path d="M22 21H7"></path>
+              <path d="m5 11 9 9"></path>
+            </svg>
+          </button>
+          <button class="tool-btn" data-tool="line" title="Line (L)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="19" x2="19" y2="5"></line>
+            </svg>
+          </button>
+          <button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            </svg>
+          </button>
+          <button class="tool-btn" data-tool="circle" title="Circle (C)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+            </svg>
+          </button>
+          <button class="tool-btn" data-tool="text" title="Text (T)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 7 4 4 20 4 20 7"></polyline>
+              <line x1="9" y1="20" x2="15" y2="20"></line>
+              <line x1="12" y1="4" x2="12" y2="20"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Color Picker & Presets -->
+        <div class="tool-group color-picker-group">
+          <input type="color" id="color-picker" value="#3B82F6" title="Choose Color" />
+          <div class="color-presets">
+            <button class="color-swatch active" data-color="#3B82F6" style="background: #3B82F6;"></button>
+            <button class="color-swatch" data-color="#EF4444" style="background: #EF4444;"></button>
+            <button class="color-swatch" data-color="#10B981" style="background: #10B981;"></button>
+            <button class="color-swatch" data-color="#F59E0B" style="background: #F59E0B;"></button>
+            <button class="color-swatch" data-color="#8B5CF6" style="background: #8B5CF6;"></button>
+            <button class="color-swatch" data-color="#EC4899" style="background: #EC4899;"></button>
+            <button class="color-swatch" data-color="#FFFFFF" style="background: #FFFFFF;"></button>
+            <button class="color-swatch" data-color="#1E293B" style="background: #1E293B;"></button>
+          </div>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Size Slider -->
+        <div class="tool-group size-group">
+          <label for="size-slider" class="size-label">
+            Size: <span id="size-value">5px</span>
+          </label>
+          <input type="range" id="size-slider" min="1" max="50" value="5" />
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Actions (Undo, Redo, Clear, Save) -->
+        <div class="tool-group action-group">
+          <button id="undo-btn" class="action-btn" title="Global Undo (Ctrl+Z)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 7v6h6"></path>
+              <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+            </svg>
+            Undo
+          </button>
+          <button id="redo-btn" class="action-btn" title="Global Redo (Ctrl+Y)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 7v6h-6"></path>
+              <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+            </svg>
+            Redo
+          </button>
+          <button id="clear-btn" class="action-btn danger" title="Clear Canvas">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Clear
+          </button>
+          <button id="save-btn" class="action-btn success" title="Export as PNG">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Save PNG
+          </button>
+        </div>
+      </aside>
+
+      <!-- Canvas Area -->
+      <div id="canvas-container" class="canvas-container">
+        <!-- Persistent Main Canvas (Stores Finalized Drawings) -->
+        <canvas id="main-canvas"></canvas>
+        <!-- Overlay Canvas (Live Drawing Strokes & Cursors) -->
+        <canvas id="overlay-canvas"></canvas>
+        <!-- Remote User Dynamic Cursors Layer -->
+        <div id="cursors-layer"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Client Script -->
+  <script type="module" src="/dist/client/main.js"></script>
+</body>
+</html>
