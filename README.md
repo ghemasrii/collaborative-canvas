@@ -30,19 +30,31 @@ npm start
 ```
 The server will start at `http://localhost:3000`.
 
-### 4. Development Mode (Optional)
-To run with live auto-rebuild:
-```bash
-npm run dev
-```
+---
+
+## 🌐 Live Deployment Guide
+
+Since this application uses persistent, bi-directional WebSockets (`ws`), it requires a host supporting Node.js stateful web services:
+
+### Option 1: Render (Recommended - Free Tier)
+1. Go to [Render Dashboard](https://dashboard.render.com/) and click **New +** -> **Web Service**.
+2. Connect your GitHub repository: `ghemasrii/collaborative-canvas`.
+3. Configure settings:
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+4. Click **Create Web Service**. Your live URL will be generated (e.g., `https://collaborative-canvas-xxx.onrender.com`).
+
+### Option 2: Railway
+1. Go to [Railway.app](https://railway.app/) and click **New Project** -> **Deploy from GitHub repo**.
+2. Select `ghemasrii/collaborative-canvas`. Railway auto-detects Node.js and deploys both Express and WebSocket servers automatically.
 
 ---
 
 ## 👥 How to Test with Multiple Users
 
-1. Open `http://localhost:3000` in your primary browser.
-2. Open a **second browser window** (or Incognito tab) to `http://localhost:3000`.
-3. Alternatively, share your local network IP (e.g. `http://192.168.x.x:3000`) with devices on the same local network.
+1. Open your application URL in your primary browser.
+2. Open a **second browser window** (or Incognito tab).
+3. Alternatively, share your live app URL with friends/colleagues.
 
 ### Multi-User Features to Test:
 - **Live Real-Time Drawing**: Draw on Window A — notice how strokes render live on Window B in real-time as your mouse moves.
@@ -79,7 +91,7 @@ npm run dev
 ## ⚠️ Known Limitations
 
 1. **Memory Bounds**: Drawing history is maintained in server memory per room. For production scaling with millions of operations, room snapshots could be persisted to Redis or MongoDB.
-2. **Text Editing**: Text elements are committed on placement; editing existing text shapes on canvas requires vector object selection (could be added as an extension).
+2. **Text Editing**: Text elements are committed on placement; editing existing text shapes on canvas requires vector object selection.
 3. **High Latency Networks**: Under extreme network latency (>500ms), remote live cursor updates are smoothed via CSS transforms, but stroke completion waits for `DRAW_END` packet.
 
 ---
