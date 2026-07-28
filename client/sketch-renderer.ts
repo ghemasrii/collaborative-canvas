@@ -86,8 +86,8 @@ export class SketchRenderer {
 
     ctx.save();
 
-    if (fillStyle !== 'none' && fillColor && fillColor !== 'transparent') {
-      this.drawFillPattern(ctx, rx, ry, rw, rh, fillColor, fillStyle);
+    if (fillColor && fillColor !== 'transparent' && fillColor !== 'none') {
+      this.drawFillPattern(ctx, rx, ry, rw, rh, fillColor, fillStyle || 'solid');
     }
 
     this.drawSketchyLine(ctx, rx, ry, rx + rw, ry, color, width, sloppiness, dashStyle);
@@ -112,7 +112,7 @@ export class SketchRenderer {
   ): void {
     ctx.save();
 
-    if (fillStyle !== 'none' && fillColor && fillColor !== 'transparent') {
+    if (fillColor && fillColor !== 'transparent' && fillColor !== 'none') {
       ctx.save();
       ctx.fillStyle = fillColor;
       ctx.beginPath();
@@ -173,7 +173,7 @@ export class SketchRenderer {
     const bottom = { x: rx + rw / 2, y: ry + rh };
     const left = { x: rx, y: ry + rh / 2 };
 
-    if (fillStyle !== 'none' && fillColor && fillColor !== 'transparent') {
+    if (fillColor && fillColor !== 'transparent' && fillColor !== 'none') {
       ctx.save();
       ctx.fillStyle = fillColor;
       ctx.beginPath();
@@ -281,13 +281,17 @@ export class SketchRenderer {
   ): void {
     ctx.save();
 
-    if (fillStyle === 'solid') {
+    if (fillStyle === 'solid' || fillStyle === 'none' || !fillStyle) {
       ctx.fillStyle = color;
       ctx.fillRect(x, y, w, h);
     } else if (fillStyle === 'hatch' || fillStyle === 'cross-hatch') {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.25;
+      ctx.fillRect(x, y, w, h);
+
+      ctx.globalAlpha = 0.8;
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 2;
 
       const spacing = 12;
       ctx.beginPath();

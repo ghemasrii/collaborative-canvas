@@ -103,7 +103,7 @@ class App {
       });
     });
 
-    // Color Swatches
+    // Color Swatches (Stroke)
     const colorSwatches = document.querySelectorAll('.color-swatch');
     const strokePicker = document.getElementById('stroke-color-picker') as HTMLInputElement;
     colorSwatches.forEach((swatch) => {
@@ -122,8 +122,10 @@ class App {
       });
     }
 
-    // Fill Swatches
+    // Fill Swatches & Color Picker (Background Fill)
     const fillSwatches = document.querySelectorAll('.fill-swatch');
+    const fillPicker = document.getElementById('fill-color-picker') as HTMLInputElement;
+
     fillSwatches.forEach((swatch) => {
       swatch.addEventListener('click', (e) => {
         fillSwatches.forEach((s) => s.classList.remove('active'));
@@ -131,6 +133,9 @@ class App {
         target.classList.add('active');
         const color = target.dataset.fill || 'transparent';
         this.currentFillColor = color;
+        if (fillPicker && color !== 'transparent') {
+          fillPicker.value = color;
+        }
 
         if (color === 'transparent') {
           this.currentFillStyle = 'none';
@@ -143,6 +148,16 @@ class App {
         }
       });
     });
+
+    if (fillPicker) {
+      fillPicker.addEventListener('input', (e) => {
+        this.currentFillColor = (e.target as HTMLInputElement).value;
+        if (this.currentFillStyle === 'none') {
+          this.currentFillStyle = 'solid';
+        }
+        this.updateFillStyleSegmentedUI(this.currentFillStyle);
+      });
+    }
 
     // Segmented Controls
     this.bindSegmentedControl('data-fill-style', (val) => {
