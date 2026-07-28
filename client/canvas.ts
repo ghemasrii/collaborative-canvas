@@ -22,7 +22,8 @@ export type ToolType =
   | 'text'
   | 'sticky'
   | 'select'
-  | 'hand';
+  | 'hand'
+  | 'image';
 
 export interface DrawingAction {
   id: string;
@@ -39,6 +40,7 @@ export interface DrawingAction {
   points: Point[];
   text?: string;
   noteColor?: string;
+  imageUrl?: string;
   timestamp: number;
   undone: boolean;
 }
@@ -56,6 +58,7 @@ export interface InProgressStroke {
   points: Point[];
   text?: string;
   noteColor?: string;
+  imageUrl?: string;
 }
 
 export class CanvasManager {
@@ -71,8 +74,10 @@ export class CanvasManager {
 
   private gridStyle: 'dots' | 'mesh' | 'none' = 'dots';
   private theme: 'light' | 'dark' = 'dark';
+  private canvasBgColor = '#121212';
 
   private remoteLiveStrokes = new Map<string, InProgressStroke>();
+  private imageCache = new Map<string, HTMLImageElement>();
 
   constructor(mainCanvasId: string, overlayCanvasId: string, viewport: ViewportManager) {
     this.mainCanvas = document.getElementById(mainCanvasId) as HTMLCanvasElement;
@@ -89,16 +94,18 @@ export class CanvasManager {
     this.gridStyle = style;
   }
 
-  public setTheme(theme: 'light' | 'dark'): void {
-    this.theme = theme;
+  public setCanvasBgColor(color: string): void {
+    this.canvasBgColor = color;
     const container = this.mainCanvas.parentElement;
     if (container) {
-      if (theme === 'light') {
-        container.style.backgroundColor = '#ffffff';
-      } else {
-        container.style.backgroundColor = '#121212';
-      }
+      container.style.backgroundColor = color;
     }
+  }
+
+  public setTheme(theme: 'light' | 'dark'): void {
+    this.theme = theme;
+    const color = theme === 'light' ? '#ffffff' : '#121212';
+    this.setCanvasBgColor(color);
   }
 
   public resizeCanvas(): void {
@@ -173,7 +180,8 @@ export class CanvasManager {
       strokeWidth,
       points,
       text,
-      noteColor
+      noteColor,
+      imageUrl
     } = action;
 
     if (!points || points.length === 0) return;
@@ -188,7 +196,7 @@ export class CanvasManager {
       }
 
       case 'eraser': {
-        this.drawFreehand(ctx, points, '#121212', strokeWidth * 2, true);
+        this.drawFreehand(ctx, points, this.canvasBgColor, strokeWidth * 2, true);
         break;
       }
 
@@ -291,6 +299,15 @@ export class CanvasManager {
         break;
       }
 
+      case 'image': {
+        if (imageUrl) {
+          const w = end.x - start.x;
+          const h = end.y - start.y;
+          this.drawImageAction(ctx, imageUrl, start.x, start.y, w, h);
+        }
+        break;
+      }
+
       case 'text': {
         if (text) {
           ctx.save();
@@ -301,6 +318,33 @@ export class CanvasManager {
         }
         break;
       }
+    }
+  }
+
+  private drawImageAction(
+    ctx: CanvasRenderingContext2D,
+    url: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number
+  ): void {
+    const rx = Math.min(x, x + w);
+    const ry = Math.min(y, y + h);
+    const rw = Math.max(40, Math.abs(w));
+    const rh = Math.max(40, Math.abs(h));
+
+    let img = this.imageCache.get(url);
+    if (img && img.complete) {
+      ctx.drawImage(img, rx, ry, rw, rh);
+    } else if (!img) {
+      img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        this.redrawOverlay();
+      };
+      img.src = url;
+      this.imageCache.set(url, img);
     }
   }
 
@@ -355,7 +399,6 @@ export class CanvasManager {
       if (!action.undone) {
         this.drawActionOnContext(this.mainCtx, action);
 
-        // Highlight selection box if selected
         if (selectedActionId === action.id && action.points.length > 0) {
           this.drawSelectionBox(this.mainCtx, action);
         }
@@ -374,6 +417,14 @@ export class CanvasManager {
     ctx.lineWidth = 1.5 / this.viewport.getZoom();
     ctx.setLineDash([4, 4]);
     ctx.strokeRect(bbox.x - 6, bbox.y - 6, bbox.w + 12, bbox.h + 12);
+
+    // Render handle dots
+    ctx.fillStyle = '#60a5fa';
+    const handleSize = 6 / this.viewport.getZoom();
+    ctx.fillRect(bbox.x - 6 - handleSize / 2, bbox.y - 6 - handleSize / 2, handleSize, handleSize);
+    ctx.fillRect(bbox.x + bbox.w + 6 - handleSize / 2, bbox.y - 6 - handleSize / 2, handleSize, handleSize);
+    ctx.fillRect(bbox.x - 6 - handleSize / 2, bbox.y + bbox.h + 6 - handleSize / 2, handleSize, handleSize);
+    ctx.fillRect(bbox.x + bbox.w + 6 - handleSize / 2, bbox.y + bbox.h + 6 - handleSize / 2, handleSize, handleSize);
     ctx.restore();
   }
 
@@ -391,8 +442,8 @@ export class CanvasManager {
     return {
       x: minX,
       y: minY,
-      w: Math.max(20, maxX - minX),
-      h: Math.max(20, maxY - minY)
+      w: Math.max(30, maxX - minX),
+      h: Math.max(30, maxY - minY)
     };
   }
 
@@ -415,7 +466,6 @@ export class CanvasManager {
     return null;
   }
 
-  // Remote streaming methods
   public startRemoteStroke(stroke: InProgressStroke): void {
     this.remoteLiveStrokes.set(stroke.actionId, stroke);
     this.redrawOverlay();
@@ -457,7 +507,7 @@ export class CanvasManager {
     exportCanvas.height = this.mainCanvas.height;
     const ctx = exportCanvas.getContext('2d')!;
 
-    ctx.fillStyle = this.theme === 'dark' ? '#121212' : '#ffffff';
+    ctx.fillStyle = this.canvasBgColor;
     ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
     ctx.drawImage(this.mainCanvas, 0, 0);
 

@@ -1,26 +1,26 @@
 :root {
+  --bg-canvas: #fefcbf;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(0, 0, 0, 0.12);
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --accent-primary: #3b82f6;
+  --accent-active: #2563eb;
+  --radius-lg: 14px;
+  --radius-md: 8px;
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --font-main: 'Inter', -apple-system, sans-serif;
+  --font-sketch: 'Caveat', cursive;
+}
+
+body.dark-theme {
   --bg-canvas: #121212;
-  --panel-bg: rgba(24, 24, 27, 0.85);
+  --panel-bg: rgba(24, 24, 27, 0.88);
   --panel-border: rgba(255, 255, 255, 0.12);
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --accent-primary: #3b82f6;
   --accent-active: #60a5fa;
-  --radius-lg: 14px;
-  --radius-md: 8px;
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-  --font-main: 'Inter', -apple-system, sans-serif;
-  --font-sketch: 'Caveat', cursive;
-}
-
-body.light-theme {
-  --bg-canvas: #ffffff;
-  --panel-bg: rgba(255, 255, 255, 0.9);
-  --panel-border: rgba(0, 0, 0, 0.12);
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --accent-primary: #2563eb;
-  --accent-active: #3b82f6;
 }
 
 * {
@@ -93,8 +93,8 @@ body, html {
 }
 
 .tool-btn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: var(--radius-md);
   background: transparent;
   border: none;
@@ -103,18 +103,37 @@ body, html {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  position: relative;
   transition: all 0.15s ease;
 }
 
 .tool-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--text-main);
 }
 
+body.dark-theme .tool-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .tool-btn.active {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+body.dark-theme .tool-btn.active {
   background: var(--accent-primary);
   color: #ffffff;
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.hotkey-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.6;
 }
 
 /* User & Room Pill */
@@ -133,14 +152,18 @@ body, html {
 }
 
 .room-selector input {
-  width: 100px;
-  background: rgba(0, 0, 0, 0.2);
+  width: 90px;
+  background: rgba(0, 0, 0, 0.05);
   border: 1px solid var(--panel-border);
   color: var(--text-main);
   padding: 4px 8px;
   border-radius: var(--radius-md);
   font-size: 12px;
   outline: none;
+}
+
+body.dark-theme .room-selector input {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .icon-btn {
@@ -153,7 +176,7 @@ body, html {
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .avatars-group {
@@ -166,12 +189,12 @@ body, html {
   position: absolute;
   top: 72px;
   left: 16px;
-  width: 220px;
+  width: 230px;
   padding: 16px;
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   z-index: 90;
   max-height: calc(100vh - 140px);
   overflow-y: auto;
@@ -181,6 +204,12 @@ body, html {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.prop-divider {
+  height: 1px;
+  background: var(--panel-border);
+  margin: 2px 0;
 }
 
 .prop-title {
@@ -198,31 +227,35 @@ body, html {
   align-items: center;
 }
 
-.color-swatch, .fill-swatch {
+.color-swatch, .fill-swatch, .canvas-bg-swatch {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  border: 2px solid transparent;
+  border-radius: 6px;
+  border: 1.5px solid rgba(0,0,0,0.15);
   cursor: pointer;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
 }
 
-.color-swatch:hover, .fill-swatch:hover {
-  transform: scale(1.2);
+.color-swatch:hover, .fill-swatch:hover, .canvas-bg-swatch:hover {
+  transform: scale(1.15);
 }
 
-.color-swatch.active, .fill-swatch.active {
-  border-color: var(--text-main);
-  box-shadow: 0 0 6px rgba(255,255,255,0.4);
+.color-swatch.active, .fill-swatch.active, .canvas-bg-swatch.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary);
 }
 
-#stroke-color-picker {
+#stroke-color-picker, #fill-color-picker, #custom-canvas-bg-picker {
   -webkit-appearance: none;
   appearance: none;
   border: none;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 6px;
   cursor: pointer;
   background: transparent;
 }
@@ -230,10 +263,14 @@ body, html {
 /* Segmented Control Buttons */
 .segmented-control {
   display: flex;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.05);
   padding: 3px;
   border-radius: var(--radius-md);
   border: 1px solid var(--panel-border);
+}
+
+body.dark-theme .segmented-control {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .segment-btn {
@@ -268,7 +305,7 @@ body, html {
 }
 
 .action-btn {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.05);
   border: 1px solid var(--panel-border);
   color: var(--text-main);
   padding: 6px 10px;
@@ -279,18 +316,164 @@ body, html {
 }
 
 .action-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+body.dark-theme .action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.action-btn.danger {
-  color: #ef4444;
+.action-btn.danger { color: #ef4444; }
+.action-btn.success { color: #10b981; }
+
+/* Floating Object Action Controls Bar (Matching Screenshot 1) */
+.object-actions-bar {
+  position: absolute;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  transition: opacity 0.15s ease;
 }
 
-.action-btn.success {
-  color: #10b981;
+.obj-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Bottom Controls (Zoom & Theme) */
+.obj-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Modal Overlay & Clipart Dialog (Matching Screenshot 1) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clipart-dialog {
+  width: 360px;
+  max-height: 80vh;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.modal-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.modal-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.upload-section {
+  width: 100%;
+}
+
+.upload-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: #ef4444;
+  color: #ffffff;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.upload-btn input {
+  display: none;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--panel-border);
+  outline: none;
+  font-size: 13px;
+  background: rgba(0,0,0,0.05);
+  color: var(--text-main);
+}
+
+.clipart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.clipart-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  background: rgba(0,0,0,0.05);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.clipart-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-2px);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Bottom Controls */
 .bottom-controls {
   position: absolute;
   bottom: 16px;
@@ -315,7 +498,7 @@ body, html {
 }
 
 .zoom-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .zoom-val {
@@ -338,7 +521,7 @@ body, html {
   color: var(--text-muted);
 }
 
-/* Infinite Canvas Container */
+/* Canvas Area */
 .canvas-container {
   width: 100%;
   height: 100%;
@@ -358,7 +541,6 @@ canvas {
   pointer-events: auto;
 }
 
-/* Remote Cursors Layer */
 #cursors-layer {
   position: absolute;
   top: 0;

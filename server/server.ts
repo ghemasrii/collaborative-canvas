@@ -40,6 +40,7 @@ interface ActiveStroke {
   points: Point[];
   text?: string;
   noteColor?: string;
+  imageUrl?: string;
   timestamp: number;
 }
 
@@ -128,6 +129,7 @@ wss.on('connection', (ws: WebSocket) => {
             points: [data.point],
             text: data.text,
             noteColor: data.noteColor,
+            imageUrl: data.imageUrl,
             timestamp: Date.now()
           };
           activeStrokes.set(strokeId, stroke);
@@ -149,7 +151,8 @@ wss.on('connection', (ws: WebSocket) => {
               strokeWidth: data.strokeWidth,
               point: data.point,
               text: data.text,
-              noteColor: data.noteColor
+              noteColor: data.noteColor,
+              imageUrl: data.imageUrl
             },
             userSession.id
           );
@@ -196,6 +199,7 @@ wss.on('connection', (ws: WebSocket) => {
             points: finalPoints,
             text: data.text || (stroke ? stroke.text : undefined),
             noteColor: data.noteColor || (stroke ? stroke.noteColor : undefined),
+            imageUrl: data.imageUrl || (stroke ? stroke.imageUrl : undefined),
             timestamp: Date.now(),
             undone: false
           };
@@ -216,6 +220,19 @@ wss.on('connection', (ws: WebSocket) => {
             roomManager.broadcastToRoom(roomId, {
               type: 'STATE_MUTATED',
               actionType: 'move',
+              mutatedBy: userSession.name,
+              actions: room.state.getActiveActions()
+            });
+          }
+          break;
+        }
+
+        case 'DELETE_ACTION': {
+          const deleted = room.state.deleteAction(data.actionId);
+          if (deleted) {
+            roomManager.broadcastToRoom(roomId, {
+              type: 'STATE_MUTATED',
+              actionType: 'delete',
               mutatedBy: userSession.name,
               actions: room.state.getActiveActions()
             });

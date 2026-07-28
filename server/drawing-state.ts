@@ -14,7 +14,8 @@ export type ToolType =
   | 'text'
   | 'sticky'
   | 'select'
-  | 'hand';
+  | 'hand'
+  | 'image';
 
 export interface DrawingAction {
   id: string;
@@ -31,6 +32,7 @@ export interface DrawingAction {
   points: Point[];
   text?: string;
   noteColor?: string;
+  imageUrl?: string;
   timestamp: number;
   undone: boolean;
 }
@@ -51,6 +53,15 @@ export class DrawingState {
         x: p.x + deltaX,
         y: p.y + deltaY
       }));
+      return true;
+    }
+    return false;
+  }
+
+  public deleteAction(actionId: string): boolean {
+    const action = this.actions.find((a) => a.id === actionId);
+    if (action) {
+      action.undone = true;
       return true;
     }
     return false;

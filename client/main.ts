@@ -15,7 +15,9 @@ class App {
   private historyManager: HistoryManager;
 
   private currentTool: ToolType = 'brush';
-  private currentColor = '#f8fafc';
+  private isToolLocked = false;
+
+  private currentColor = '#1e293b';
   private currentFillColor = '#3b82f6';
   private currentFillStyle: FillStyleOption = 'solid';
   private currentDashStyle: DashStyleOption = 'solid';
@@ -36,7 +38,7 @@ class App {
   private currentUser: { id: string; name: string; color: string } | null = null;
   private currentRoom = 'default';
   private currentGridStyle: 'dots' | 'mesh' | 'none' = 'dots';
-  private currentTheme: 'dark' | 'light' = 'dark';
+  private currentTheme: 'dark' | 'light' = 'light';
 
   private lastCursorSend = 0;
   private isSpacePressed = false;
@@ -50,6 +52,7 @@ class App {
       if (this.canvasManager) {
         this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
         this.canvasManager.redrawOverlay();
+        this.updateObjectActionsBarPosition();
       }
       if (this.cursorManager) {
         this.cursorManager.refreshAll();
@@ -92,16 +95,74 @@ class App {
       alert(`Room share link copied to clipboard:\n${shareUrl}`);
     });
 
+    // Lock Tool Toggle
+    const lockBtn = document.getElementById('lock-tool-btn');
+    if (lockBtn) {
+      lockBtn.addEventListener('click', () => {
+        this.isToolLocked = !this.isToolLocked;
+        if (this.isToolLocked) {
+          lockBtn.classList.add('active');
+        } else {
+          lockBtn.classList.remove('active');
+        }
+      });
+    }
+
     // Tool Buttons
-    const toolBtns = document.querySelectorAll('.tool-btn');
+    const toolBtns = document.querySelectorAll('.tool-btn:not(#lock-tool-btn)');
     toolBtns.forEach((btn) => {
       btn.addEventListener('click', (e) => {
-        toolBtns.forEach((b) => b.classList.remove('active'));
         const target = e.currentTarget as HTMLElement;
+        const tool = (target.dataset.tool as ToolType) || 'brush';
+        if (tool === 'image') {
+          this.openClipartModal();
+          return;
+        }
+        toolBtns.forEach((b) => b.classList.remove('active'));
         target.classList.add('active');
-        this.selectTool((target.dataset.tool as ToolType) || 'brush');
+        this.selectTool(tool);
       });
     });
+
+    // Theme Switcher Buttons (Matching Screenshot 3)
+    const themeButtons = document.querySelectorAll('[data-theme-mode]');
+    themeButtons.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        themeButtons.forEach((b) => b.classList.remove('active'));
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('active');
+        const mode = target.getAttribute('data-theme-mode');
+
+        if (mode === 'system') {
+          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          this.setThemeMode(isDark ? 'dark' : 'light');
+        } else {
+          this.setThemeMode(mode === 'dark' ? 'dark' : 'light');
+        }
+      });
+    });
+
+    // Canvas Background Swatches (Matching Screenshot 3)
+    const canvasBgSwatches = document.querySelectorAll('.canvas-bg-swatch');
+    const customCanvasBgPicker = document.getElementById('custom-canvas-bg-picker') as HTMLInputElement;
+
+    canvasBgSwatches.forEach((swatch) => {
+      swatch.addEventListener('click', (e) => {
+        canvasBgSwatches.forEach((s) => s.classList.remove('active'));
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('active');
+        const bg = target.dataset.canvasBg || '#fefcbf';
+        this.canvasManager.setCanvasBgColor(bg);
+        if (customCanvasBgPicker) customCanvasBgPicker.value = bg;
+      });
+    });
+
+    if (customCanvasBgPicker) {
+      customCanvasBgPicker.addEventListener('input', (e) => {
+        const bg = (e.target as HTMLInputElement).value;
+        this.canvasManager.setCanvasBgColor(bg);
+      });
+    }
 
     // Color Swatches (Stroke)
     const colorSwatches = document.querySelectorAll('.color-swatch');
@@ -111,7 +172,7 @@ class App {
         colorSwatches.forEach((s) => s.classList.remove('active'));
         const target = e.currentTarget as HTMLElement;
         target.classList.add('active');
-        this.currentColor = target.dataset.color || '#f8fafc';
+        this.currentColor = target.dataset.color || '#1e293b';
         if (strokePicker) strokePicker.value = this.currentColor;
       });
     });
@@ -198,7 +259,7 @@ class App {
       this.viewportManager.resetView();
     });
 
-    // Grid & Theme Toggles
+    // Grid Toggle
     const gridBtn = document.getElementById('grid-toggle-btn');
     gridBtn?.addEventListener('click', () => {
       if (this.currentGridStyle === 'dots') this.currentGridStyle = 'mesh';
@@ -210,20 +271,188 @@ class App {
       this.canvasManager.redrawOverlay();
     });
 
-    const themeBtn = document.getElementById('theme-toggle-btn');
-    themeBtn?.addEventListener('click', () => {
-      this.currentTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
-      document.body.className = `${this.currentTheme}-theme`;
-      themeBtn.textContent = this.currentTheme === 'dark' ? '🌙 Dark' : '☀️ Light';
-      this.canvasManager.setTheme(this.currentTheme);
-      this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
-    });
-
     // Action buttons
     document.getElementById('undo-btn')?.addEventListener('click', () => this.undo());
     document.getElementById('redo-btn')?.addEventListener('click', () => this.redo());
     document.getElementById('clear-btn')?.addEventListener('click', () => this.clearCanvas());
     document.getElementById('save-btn')?.addEventListener('click', () => this.canvasManager.exportPNG());
+
+    // Clipart Modal Controls
+    this.initClipartModal();
+
+    // Floating Object Action Bar Controls (Duplicate & Delete)
+    document.getElementById('obj-delete-btn')?.addEventListener('click', () => {
+      if (this.selectedAction) {
+        this.wsClient.send({
+          type: 'DELETE_ACTION',
+          actionId: this.selectedAction.id
+        });
+        this.selectedAction = null;
+        this.hideObjectActionsBar();
+      }
+    });
+
+    document.getElementById('obj-duplicate-btn')?.addEventListener('click', () => {
+      if (this.selectedAction) {
+        const dupPoints = this.selectedAction.points.map((p) => ({ x: p.x + 20, y: p.y + 20 }));
+        const actionId = 'act_' + Math.random().toString(36).substring(2, 9);
+        const dupAction: DrawingAction = {
+          ...this.selectedAction,
+          id: actionId,
+          points: dupPoints,
+          timestamp: Date.now()
+        };
+
+        this.wsClient.send({
+          type: 'DRAW_END',
+          actionId,
+          tool: dupAction.tool,
+          color: dupAction.color,
+          fillColor: dupAction.fillColor,
+          fillStyle: dupAction.fillStyle,
+          dashStyle: dupAction.dashStyle,
+          sloppiness: dupAction.sloppiness,
+          strokeWidth: dupAction.strokeWidth,
+          points: dupPoints,
+          text: dupAction.text,
+          noteColor: dupAction.noteColor,
+          imageUrl: dupAction.imageUrl
+        });
+
+        this.historyManager.addAction(dupAction);
+        this.selectedAction = dupAction;
+        this.canvasManager.renderActions(this.historyManager.getActiveActions(), dupAction.id);
+        this.updateObjectActionsBarPosition();
+      }
+    });
+  }
+
+  private setThemeMode(theme: 'dark' | 'light'): void {
+    this.currentTheme = theme;
+    document.body.className = `${theme}-theme`;
+    this.canvasManager.setTheme(theme);
+    this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
+  }
+
+  private initClipartModal(): void {
+    const modal = document.getElementById('clipart-modal');
+    const closeBtn = document.getElementById('close-clipart-btn');
+    const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+    const searchInput = document.getElementById('clipart-search') as HTMLInputElement;
+    const cards = document.querySelectorAll('.clipart-card');
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.closeClipartModal());
+    }
+
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) this.closeClipartModal();
+      });
+    }
+
+    // Clipart Cards Selection
+    cards.forEach((card) => {
+      card.addEventListener('click', () => {
+        const emoji = card.getAttribute('data-emoji') || '⭐';
+        const svgUrl = this.emojiToDataUrl(emoji);
+        this.insertImageOnCanvas(svgUrl);
+        this.closeClipartModal();
+      });
+    });
+
+    // Custom Image File Upload
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            if (dataUrl) {
+              this.insertImageOnCanvas(dataUrl);
+              this.closeClipartModal();
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    // Search filter
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const query = (e.target as HTMLInputElement).value.toLowerCase();
+        cards.forEach((c) => {
+          const name = c.getAttribute('data-name')?.toLowerCase() || '';
+          if (name.includes(query)) {
+            (c as HTMLElement).style.display = 'flex';
+          } else {
+            (c as HTMLElement).style.display = 'none';
+          }
+        });
+      });
+    }
+  }
+
+  private openClipartModal(): void {
+    const modal = document.getElementById('clipart-modal');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  private closeClipartModal(): void {
+    const modal = document.getElementById('clipart-modal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  private emojiToDataUrl(emoji: string): string {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    ctx.font = '96px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 64, 68);
+    return canvas.toDataURL('image/png');
+  }
+
+  private insertImageOnCanvas(imageUrl: string): void {
+    const centerScreen = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const worldPt = this.viewportManager.screenToWorld(centerScreen.x, centerScreen.y);
+
+    const actionId = 'act_' + Math.random().toString(36).substring(2, 9);
+    const startPoint = { x: worldPt.x - 60, y: worldPt.y - 60 };
+    const endPoint = { x: worldPt.x + 60, y: worldPt.y + 60 };
+
+    const action: DrawingAction = {
+      id: actionId,
+      userId: this.currentUser?.id || 'local',
+      userName: this.currentUser?.name || 'Local',
+      userColor: this.currentUser?.color || '#3b82f6',
+      tool: 'image',
+      color: '#000000',
+      strokeWidth: 3,
+      points: [startPoint, endPoint],
+      imageUrl,
+      timestamp: Date.now(),
+      undone: false
+    };
+
+    this.wsClient.send({
+      type: 'DRAW_END',
+      actionId,
+      tool: 'image',
+      color: '#000000',
+      strokeWidth: 3,
+      points: [startPoint, endPoint],
+      imageUrl
+    });
+
+    this.historyManager.addAction(action);
+    this.canvasManager.renderActions(this.historyManager.getActiveActions(), action.id);
+    this.selectedAction = action;
+    this.updateObjectActionsBarPosition();
   }
 
   private updateFillStyleSegmentedUI(style: FillStyleOption): void {
@@ -262,9 +491,10 @@ class App {
     this.currentTool = tool;
     if (tool !== 'select') {
       this.selectedAction = null;
+      this.hideObjectActionsBar();
       this.canvasManager.renderActions(this.historyManager.getActiveActions(), null);
     }
-    const toolBtns = document.querySelectorAll('.tool-btn');
+    const toolBtns = document.querySelectorAll('.tool-btn:not(#lock-tool-btn)');
     toolBtns.forEach((btn) => {
       const el = btn as HTMLElement;
       if (el.dataset.tool === tool) el.classList.add('active');
@@ -329,7 +559,8 @@ class App {
             strokeWidth: data.strokeWidth,
             points: [data.point],
             text: data.text,
-            noteColor: data.noteColor
+            noteColor: data.noteColor,
+            imageUrl: data.imageUrl
           });
           break;
 
@@ -377,7 +608,6 @@ class App {
   private initCanvasEvents(): void {
     const overlay = document.getElementById('overlay-canvas') as HTMLCanvasElement;
 
-    // Zoom on Wheel
     overlay.addEventListener(
       'wheel',
       (e) => {
@@ -388,12 +618,10 @@ class App {
       { passive: false }
     );
 
-    // Pointer events for drawing & panning
     overlay.addEventListener('mousedown', (e) => {
       const screenPt = this.getScreenPoint(e);
       const worldPt = this.viewportManager.screenToWorld(screenPt.x, screenPt.y);
 
-      // Pan canvas if Middle click, Hand tool, or Space pressed
       if (e.button === 1 || this.currentTool === 'hand' || this.isSpacePressed) {
         this.isPanning = true;
         this.lastPanPoint = { x: e.clientX, y: e.clientY };
@@ -401,7 +629,6 @@ class App {
         return;
       }
 
-      // Selection / Move tool
       if (this.currentTool === 'select') {
         const hitAction = this.canvasManager.findActionAtPoint(this.historyManager.getActiveActions(), worldPt);
         if (hitAction) {
@@ -409,8 +636,10 @@ class App {
           this.isMovingAction = true;
           this.moveStartPoint = worldPt;
           this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction.id);
+          this.updateObjectActionsBarPosition();
         } else {
           this.selectedAction = null;
+          this.hideObjectActionsBar();
           this.canvasManager.renderActions(this.historyManager.getActiveActions(), null);
         }
         return;
@@ -442,6 +671,7 @@ class App {
         }));
 
         this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction.id);
+        this.updateObjectActionsBarPosition();
 
         this.wsClient.send({
           type: 'MOVE_ACTION',
@@ -462,7 +692,6 @@ class App {
     overlay.addEventListener('mouseup', () => this.handleEnd());
     overlay.addEventListener('mouseleave', () => this.handleEnd());
 
-    // Touch support for mobile devices
     overlay.addEventListener('touchstart', (e) => {
       if (e.touches.length === 1) {
         const screenPt = this.getScreenPoint(e.touches[0]);
@@ -493,6 +722,29 @@ class App {
     });
 
     overlay.addEventListener('touchend', () => this.handleEnd());
+  }
+
+  private updateObjectActionsBarPosition(): void {
+    const bar = document.getElementById('object-actions-bar');
+    if (!bar || !this.selectedAction) {
+      this.hideObjectActionsBar();
+      return;
+    }
+
+    const bbox = this.canvasManager.getActionBoundingBox(this.selectedAction);
+    if (bbox) {
+      const screenTopLeft = this.viewportManager.worldToScreen(bbox.x, bbox.y);
+      bar.style.left = `${Math.max(20, screenTopLeft.x + (bbox.w * this.viewportManager.getZoom()) / 2 - 40)}px`;
+      bar.style.top = `${Math.max(20, screenTopLeft.y - 45)}px`;
+      bar.classList.remove('hidden');
+    } else {
+      this.hideObjectActionsBar();
+    }
+  }
+
+  private hideObjectActionsBar(): void {
+    const bar = document.getElementById('object-actions-bar');
+    if (bar) bar.classList.add('hidden');
   }
 
   private sendCursorPosition(point: Point): void {
@@ -584,6 +836,10 @@ class App {
 
     this.historyManager.addAction(action);
     this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
+
+    if (!this.isToolLocked) {
+      this.selectTool('select');
+    }
   }
 
   private handleMove(point: Point): void {
@@ -626,6 +882,10 @@ class App {
     this.currentActionId = null;
     this.currentPoints = [];
     this.canvasManager.clearOverlay();
+
+    if (!this.isToolLocked && this.currentTool !== 'brush' && this.currentTool !== 'eraser') {
+      this.selectTool('select');
+    }
   }
 
   private updateOverlay(): void {
@@ -677,17 +937,28 @@ class App {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         this.redo();
-      } else if (e.key.toLowerCase() === 'v') this.selectTool('select');
+      } else if (e.key === '1' || e.key.toLowerCase() === 'v') this.selectTool('select');
+      else if (e.key === '2' || e.key.toLowerCase() === 'r') this.selectTool('rectangle');
+      else if (e.key === '3' || e.key.toLowerCase() === 'd') this.selectTool('diamond');
+      else if (e.key === '4' || e.key.toLowerCase() === 'c') this.selectTool('circle');
+      else if (e.key === '5' || e.key.toLowerCase() === 'a') this.selectTool('arrow');
+      else if (e.key === '6' || e.key.toLowerCase() === 'l') this.selectTool('line');
+      else if (e.key === '7' || e.key.toLowerCase() === 'b') this.selectTool('brush');
+      else if (e.key === '8' || e.key.toLowerCase() === 't') this.selectTool('text');
+      else if (e.key === '9') this.openClipartModal();
+      else if (e.key === '0' || e.key.toLowerCase() === 'e') this.selectTool('eraser');
       else if (e.key.toLowerCase() === 'h') this.selectTool('hand');
-      else if (e.key.toLowerCase() === 'b') this.selectTool('brush');
-      else if (e.key.toLowerCase() === 'r') this.selectTool('rectangle');
-      else if (e.key.toLowerCase() === 'd') this.selectTool('diamond');
-      else if (e.key.toLowerCase() === 'c') this.selectTool('circle');
-      else if (e.key.toLowerCase() === 'a') this.selectTool('arrow');
-      else if (e.key.toLowerCase() === 'l') this.selectTool('line');
-      else if (e.key.toLowerCase() === 't') this.selectTool('text');
       else if (e.key.toLowerCase() === 'n') this.selectTool('sticky');
-      else if (e.key.toLowerCase() === 'e') this.selectTool('eraser');
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.selectedAction) {
+          this.wsClient.send({
+            type: 'DELETE_ACTION',
+            actionId: this.selectedAction.id
+          });
+          this.selectedAction = null;
+          this.hideObjectActionsBar();
+        }
+      }
     });
 
     window.addEventListener('keyup', (e) => {
