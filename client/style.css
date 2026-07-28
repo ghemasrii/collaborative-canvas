@@ -326,7 +326,7 @@ body.dark-theme .action-btn:hover {
 .action-btn.danger { color: #ef4444; }
 .action-btn.success { color: #10b981; }
 
-/* Floating Object Action Controls Bar (Matching Screenshot 1) */
+/* Floating Object Action Controls Bar */
 .object-actions-bar {
   position: absolute;
   z-index: 120;
@@ -359,15 +359,15 @@ body.dark-theme .action-btn:hover {
   display: none !important;
 }
 
-/* Modal Overlay & Clipart Dialog (Matching Screenshot 1) */
+/* Modal Overlay & Clipart Dialog */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -375,8 +375,8 @@ body.dark-theme .action-btn:hover {
 }
 
 .clipart-dialog {
-  width: 360px;
-  max-height: 80vh;
+  width: 400px;
+  max-height: 85vh;
   border-radius: 16px;
   display: flex;
   flex-direction: column;
@@ -399,7 +399,7 @@ body.dark-theme .action-btn:hover {
 .modal-close-btn {
   background: transparent;
   border: none;
-  font-size: 22px;
+  font-size: 24px;
   cursor: pointer;
   color: var(--text-muted);
 }
@@ -435,7 +435,7 @@ body.dark-theme .action-btn:hover {
 
 .search-box input {
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: 20px;
   border: 1px solid var(--panel-border);
   outline: none;
@@ -444,11 +444,15 @@ body.dark-theme .action-btn:hover {
   color: var(--text-main);
 }
 
+body.dark-theme .search-box input {
+  background: rgba(0,0,0,0.25);
+}
+
 .clipart-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  max-height: 320px;
+  max-height: 340px;
   overflow-y: auto;
 }
 
@@ -457,20 +461,34 @@ body.dark-theme .action-btn:hover {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 12px;
-  background: rgba(0,0,0,0.05);
+  padding: 12px 8px;
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 10px;
   cursor: pointer;
-  font-size: 12px;
   border: 1px solid transparent;
   transition: all 0.15s ease;
+}
+
+body.dark-theme .clipart-card {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .clipart-card:hover {
   border-color: var(--accent-primary);
   transform: translateY(-2px);
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.clipart-emoji {
+  font-size: 36px;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.clipart-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-main);
 }
 
 /* Bottom Controls */

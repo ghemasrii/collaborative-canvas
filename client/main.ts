@@ -17,7 +17,7 @@ class App {
   private currentTool: ToolType = 'brush';
   private isToolLocked = false;
 
-  private currentColor = '#1e293b';
+  private currentColor = '#f8fafc';
   private currentFillColor = '#3b82f6';
   private currentFillStyle: FillStyleOption = 'solid';
   private currentDashStyle: DashStyleOption = 'solid';
@@ -38,7 +38,7 @@ class App {
   private currentUser: { id: string; name: string; color: string } | null = null;
   private currentRoom = 'default';
   private currentGridStyle: 'dots' | 'mesh' | 'none' = 'dots';
-  private currentTheme: 'dark' | 'light' = 'light';
+  private currentTheme: 'dark' | 'light' = 'dark';
 
   private lastCursorSend = 0;
   private isSpacePressed = false;
@@ -151,7 +151,7 @@ class App {
         canvasBgSwatches.forEach((s) => s.classList.remove('active'));
         const target = e.currentTarget as HTMLElement;
         target.classList.add('active');
-        const bg = target.dataset.canvasBg || '#fefcbf';
+        const bg = target.dataset.canvasBg || '#121212';
         this.canvasManager.setCanvasBgColor(bg);
         if (customCanvasBgPicker) customCanvasBgPicker.value = bg;
       });
@@ -172,7 +172,7 @@ class App {
         colorSwatches.forEach((s) => s.classList.remove('active'));
         const target = e.currentTarget as HTMLElement;
         target.classList.add('active');
-        this.currentColor = target.dataset.color || '#1e293b';
+        this.currentColor = target.dataset.color || '#f8fafc';
         if (strokePicker) strokePicker.value = this.currentColor;
       });
     });
@@ -257,6 +257,9 @@ class App {
 
     document.getElementById('zoom-reset-btn')?.addEventListener('click', () => {
       this.viewportManager.resetView();
+      this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
+      this.canvasManager.redrawOverlay();
+      this.cursorManager.refreshAll();
     });
 
     // Grid Toggle
@@ -330,7 +333,9 @@ class App {
   private setThemeMode(theme: 'dark' | 'light'): void {
     this.currentTheme = theme;
     document.body.className = `${theme}-theme`;
+    const bgColor = theme === 'light' ? '#fefcbf' : '#121212';
     this.canvasManager.setTheme(theme);
+    this.canvasManager.setCanvasBgColor(bgColor);
     this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
   }
 
@@ -407,13 +412,13 @@ class App {
 
   private emojiToDataUrl(emoji: string): string {
     const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
+    canvas.width = 160;
+    canvas.height = 160;
     const ctx = canvas.getContext('2d')!;
-    ctx.font = '96px sans-serif';
+    ctx.font = '100px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(emoji, 64, 68);
+    ctx.fillText(emoji, 80, 85);
     return canvas.toDataURL('image/png');
   }
 

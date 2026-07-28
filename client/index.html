@@ -11,7 +11,7 @@
 </head>
 <body class="dark-theme">
   <div id="app">
-    <!-- Top Floating Toolbar (Excalidraw Style matching Screenshot 2) -->
+    <!-- Top Floating Toolbar -->
     <div class="top-toolbar-container">
       <div class="brand-pill glass">
         <span class="brand-logo">✏️</span>
@@ -124,13 +124,12 @@
 
     <!-- Left Style & Properties Panel -->
     <aside class="sidebar-properties glass">
-      <!-- Theme & Canvas Background Section (Matching Screenshot 3) -->
       <div class="prop-section">
         <label class="prop-title">Theme</label>
         <div class="segmented-control theme-switcher">
-          <button class="segment-btn active" data-theme-mode="light" title="Light Theme">☀️</button>
-          <button class="segment-btn" data-theme-mode="dark" title="Dark Theme">🌙</button>
-          <button class="segment-btn" data-theme-mode="system" title="System Theme">💻</button>
+          <button class="segment-btn" data-theme-mode="light" title="Light Theme">☀️ Light</button>
+          <button class="segment-btn active" data-theme-mode="dark" title="Dark Theme">🌙 Dark</button>
+          <button class="segment-btn" data-theme-mode="system" title="System Theme">💻 Auto</button>
         </div>
       </div>
 
@@ -140,31 +139,29 @@
           <button class="canvas-bg-swatch" data-canvas-bg="#ffffff" style="background: #ffffff;" title="Pure White"></button>
           <button class="canvas-bg-swatch" data-canvas-bg="#f8fafc" style="background: #f8fafc;" title="Off White"></button>
           <button class="canvas-bg-swatch" data-canvas-bg="#edf2f7" style="background: #edf2f7;" title="Soft Blue"></button>
-          <button class="canvas-bg-swatch active" data-canvas-bg="#fefcbf" style="background: #fefcbf;" title="Warm Cream"></button>
+          <button class="canvas-bg-swatch" data-canvas-bg="#fefcbf" style="background: #fefcbf;" title="Warm Cream"></button>
           <button class="canvas-bg-swatch" data-canvas-bg="#fce7f3" style="background: #fce7f3;" title="Soft Pink"></button>
-          <button class="canvas-bg-swatch" data-canvas-bg="#121212" style="background: #121212;" title="Dark Canvas"></button>
-          <input type="color" id="custom-canvas-bg-picker" value="#fefcbf" title="Custom Canvas Background" />
+          <button class="canvas-bg-swatch active" data-canvas-bg="#121212" style="background: #121212;" title="Dark Canvas"></button>
+          <input type="color" id="custom-canvas-bg-picker" value="#121212" title="Custom Canvas Background" />
         </div>
       </div>
 
       <div class="prop-divider"></div>
 
-      <!-- Stroke Color -->
       <div class="prop-section">
         <label class="prop-title">Stroke Color</label>
         <div class="color-palette">
-          <button class="color-swatch active" data-color="#1e293b" style="background: #1e293b;"></button>
-          <button class="color-swatch" data-color="#f8fafc" style="background: #f8fafc;"></button>
+          <button class="color-swatch active" data-color="#f8fafc" style="background: #f8fafc;"></button>
+          <button class="color-swatch" data-color="#e2e8f0" style="background: #e2e8f0;"></button>
           <button class="color-swatch" data-color="#ff4d4d" style="background: #ff4d4d;"></button>
           <button class="color-swatch" data-color="#22c55e" style="background: #22c55e;"></button>
           <button class="color-swatch" data-color="#3b82f6" style="background: #3b82f6;"></button>
           <button class="color-swatch" data-color="#a855f7" style="background: #a855f7;"></button>
           <button class="color-swatch" data-color="#eab308" style="background: #eab308;"></button>
-          <input type="color" id="stroke-color-picker" value="#1e293b" title="Custom Stroke Color" />
+          <input type="color" id="stroke-color-picker" value="#f8fafc" title="Custom Stroke Color" />
         </div>
       </div>
 
-      <!-- Background Fill -->
       <div class="prop-section">
         <label class="prop-title">Background Fill</label>
         <div class="color-palette">
@@ -224,7 +221,7 @@
       <button id="zoom-out-btn" class="zoom-btn" title="Zoom Out">-</button>
       <span id="zoom-val" class="zoom-val">100%</span>
       <button id="zoom-in-btn" class="zoom-btn" title="Zoom In">+</button>
-      <button id="zoom-reset-btn" class="zoom-btn" title="Reset View">Reset</button>
+      <button id="zoom-reset-btn" class="zoom-btn" title="Reset Canvas View (100%)">Reset View</button>
 
       <div class="control-divider"></div>
 
@@ -236,13 +233,13 @@
       <span id="ping-display" class="metric-badge">-- ms</span>
     </div>
 
-    <!-- Floating Object Action Controls Bar (Matching Screenshot 1) -->
+    <!-- Floating Object Action Controls Bar -->
     <div id="object-actions-bar" class="object-actions-bar glass hidden">
       <button id="obj-duplicate-btn" class="obj-btn" title="Duplicate Object">📋</button>
       <button id="obj-delete-btn" class="obj-btn danger" title="Delete Object">🗑️</button>
     </div>
 
-    <!-- Clipart / Sticker Library Modal (Matching Screenshot 1) -->
+    <!-- Clipart / Sticker Library Modal -->
     <div id="clipart-modal" class="modal-overlay hidden">
       <div class="clipart-dialog glass">
         <div class="modal-header">
@@ -251,7 +248,6 @@
         </div>
 
         <div class="modal-body">
-          <!-- File Upload Button -->
           <div class="upload-section">
             <label for="image-file-input" class="upload-btn">
               <span>📤 Load Your Own Image</span>
@@ -259,33 +255,91 @@
             </label>
           </div>
 
-          <!-- Search Box -->
           <div class="search-box">
             <input type="text" id="clipart-search" placeholder="Find stickers..." />
           </div>
 
-          <!-- Clipart Grid -->
           <div id="clipart-grid" class="clipart-grid">
-            <div class="clipart-card" data-emoji="⭐" data-name="star">⭐ Star</div>
-            <div class="clipart-card" data-emoji="🦉" data-name="owl">🦉 Owl</div>
-            <div class="clipart-card" data-emoji="🐄" data-name="cow">🐄 Cow</div>
-            <div class="clipart-card" data-emoji="🐧" data-name="penguin">🐧 Penguin</div>
-            <div class="clipart-card" data-emoji="🦓" data-name="zebra">🦓 Zebra</div>
-            <div class="clipart-card" data-emoji="🐶" data-name="dog">🐶 Dog</div>
-            <div class="clipart-card" data-emoji="🦁" data-name="lion">🦁 Lion</div>
-            <div class="clipart-card" data-emoji="🦚" data-name="peacock">🦚 Peacock</div>
-            <div class="clipart-card" data-emoji="🐆" data-name="leopard">🐆 Leopard</div>
-            <div class="clipart-card" data-emoji="🚀" data-name="rocket">🚀 Rocket</div>
-            <div class="clipart-card" data-emoji="💖" data-name="heart">💖 Heart</div>
-            <div class="clipart-card" data-emoji="👑" data-name="crown">👑 Crown</div>
-            <div class="clipart-card" data-emoji="🎯" data-name="target">🎯 Target</div>
-            <div class="clipart-card" data-emoji="💡" data-name="lightbulb">💡 Lightbulb</div>
-            <div class="clipart-card" data-emoji="🔥" data-name="fire">🔥 Fire</div>
-            <div class="clipart-card" data-emoji="✅" data-name="checkmark">✅ Checkmark</div>
-            <div class="clipart-card" data-emoji="⚠️" data-name="warning">⚠️ Warning</div>
-            <div class="clipart-card" data-emoji="😃" data-name="happy face">😃 Avatar 1</div>
-            <div class="clipart-card" data-emoji="😎" data-name="cool avatar">😎 Avatar 2</div>
-            <div class="clipart-card" data-emoji="🥳" data-name="party avatar">🥳 Avatar 3</div>
+            <div class="clipart-card" data-emoji="⭐" data-name="star">
+              <span class="clipart-emoji">⭐</span>
+              <span class="clipart-label">Star</span>
+            </div>
+            <div class="clipart-card" data-emoji="🦉" data-name="owl">
+              <span class="clipart-emoji">🦉</span>
+              <span class="clipart-label">Owl</span>
+            </div>
+            <div class="clipart-card" data-emoji="🐄" data-name="cow">
+              <span class="clipart-emoji">🐄</span>
+              <span class="clipart-label">Cow</span>
+            </div>
+            <div class="clipart-card" data-emoji="🐧" data-name="penguin">
+              <span class="clipart-emoji">🐧</span>
+              <span class="clipart-label">Penguin</span>
+            </div>
+            <div class="clipart-card" data-emoji="🦓" data-name="zebra">
+              <span class="clipart-emoji">🦓</span>
+              <span class="clipart-label">Zebra</span>
+            </div>
+            <div class="clipart-card" data-emoji="🐶" data-name="dog">
+              <span class="clipart-emoji">🐶</span>
+              <span class="clipart-label">Dog</span>
+            </div>
+            <div class="clipart-card" data-emoji="🦁" data-name="lion">
+              <span class="clipart-emoji">🦁</span>
+              <span class="clipart-label">Lion</span>
+            </div>
+            <div class="clipart-card" data-emoji="🦚" data-name="peacock">
+              <span class="clipart-emoji">🦚</span>
+              <span class="clipart-label">Peacock</span>
+            </div>
+            <div class="clipart-card" data-emoji="🐆" data-name="leopard">
+              <span class="clipart-emoji">🐆</span>
+              <span class="clipart-label">Leopard</span>
+            </div>
+            <div class="clipart-card" data-emoji="🚀" data-name="rocket">
+              <span class="clipart-emoji">🚀</span>
+              <span class="clipart-label">Rocket</span>
+            </div>
+            <div class="clipart-card" data-emoji="💖" data-name="heart">
+              <span class="clipart-emoji">💖</span>
+              <span class="clipart-label">Heart</span>
+            </div>
+            <div class="clipart-card" data-emoji="👑" data-name="crown">
+              <span class="clipart-emoji">👑</span>
+              <span class="clipart-label">Crown</span>
+            </div>
+            <div class="clipart-card" data-emoji="🎯" data-name="target">
+              <span class="clipart-emoji">🎯</span>
+              <span class="clipart-label">Target</span>
+            </div>
+            <div class="clipart-card" data-emoji="💡" data-name="lightbulb">
+              <span class="clipart-emoji">💡</span>
+              <span class="clipart-label">Lightbulb</span>
+            </div>
+            <div class="clipart-card" data-emoji="🔥" data-name="fire">
+              <span class="clipart-emoji">🔥</span>
+              <span class="clipart-label">Fire</span>
+            </div>
+            <div class="clipart-card" data-emoji="✅" data-name="checkmark">
+              <span class="clipart-emoji">✅</span>
+              <span class="clipart-label">Checkmark</span>
+            </div>
+            <div class="clipart-card" data-emoji="⚠️" data-name="warning">
+              <span class="clipart-emoji">⚠️</span>
+              <span class="clipart-label">Warning</span>
+            </div>
+            <div class="clipart-card" data-emoji="😃" data-name="happy face">
+              <span class="clipart-emoji">😃</span>
+              <span class="clipart-label">Avatar 1</span>
+            </div>
+            <div class="clipart-card" data-emoji="😎" data-name="cool avatar">
+              <span class="clipart-emoji">😎</span>
+              <span class="clipart-label">Avatar 2</span>
+            </div>
+            <div class="clipart-card" data-emoji="🥳" data-name="party avatar">
+              <span class="clipart-emoji">🥳</span>
+              <span class="clipart-label">Avatar 3</span>
+            </div>
           </div>
         </div>
       </div>
