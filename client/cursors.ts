@@ -1,3 +1,5 @@
+import { ViewportManager } from './viewport';
+
 export interface RemoteCursorData {
   userId: string;
   userName: string;
@@ -9,12 +11,22 @@ export interface RemoteCursorData {
 export class CursorManager {
   private container: HTMLElement;
   private cursors = new Map<string, HTMLElement>();
+  private lastCursorData = new Map<string, RemoteCursorData>();
+  private viewport?: ViewportManager;
 
-  constructor() {
+  constructor(viewport?: ViewportManager) {
     this.container = document.getElementById('cursors-layer') || document.body;
+    this.viewport = viewport;
+  }
+
+  public setViewport(viewport: ViewportManager): void {
+    this.viewport = viewport;
+    this.refreshAll();
   }
 
   public updateCursor(data: RemoteCursorData): void {
+    this.lastCursorData.set(data.userId, data);
+
     let cursorEl = this.cursors.get(data.userId);
 
     if (!cursorEl) {
@@ -30,7 +42,18 @@ export class CursorManager {
       this.cursors.set(data.userId, cursorEl);
     }
 
-    cursorEl.style.transform = `translate3d(${data.x}px, ${data.y}px, 0)`;
+    let screenPos = { x: data.x, y: data.y };
+    if (this.viewport) {
+      screenPos = this.viewport.worldToScreen(data.x, data.y);
+    }
+
+    cursorEl.style.transform = `translate3d(${screenPos.x}px, ${screenPos.y}px, 0)`;
+  }
+
+  public refreshAll(): void {
+    this.lastCursorData.forEach((data) => {
+      this.updateCursor(data);
+    });
   }
 
   public removeCursor(userId: string): void {
@@ -38,11 +61,13 @@ export class CursorManager {
     if (cursorEl) {
       cursorEl.remove();
       this.cursors.delete(userId);
+      this.lastCursorData.delete(userId);
     }
   }
 
   public clearAll(): void {
     this.cursors.forEach((el) => el.remove());
     this.cursors.clear();
+    this.lastCursorData.clear();
   }
 }

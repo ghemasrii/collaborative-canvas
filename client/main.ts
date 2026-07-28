@@ -1,34 +1,63 @@
 import { CanvasManager, ToolType, Point, InProgressStroke, DrawingAction } from './canvas.js';
+import { ViewportManager } from './viewport.js';
 import { WebSocketClient } from './websocket.js';
 import { CursorManager } from './cursors.js';
 import { MetricsManager } from './metrics.js';
 import { HistoryManager } from './history.js';
+import { FillStyleOption, DashStyleOption, SloppinessLevel } from './sketch-renderer.js';
 
 class App {
   private canvasManager: CanvasManager;
+  private viewportManager: ViewportManager;
   private wsClient: WebSocketClient;
   private cursorManager: CursorManager;
   private metricsManager: MetricsManager;
   private historyManager: HistoryManager;
 
   private currentTool: ToolType = 'brush';
-  private currentColor = '#3B82F6';
-  private currentSize = 5;
+  private currentColor = '#f8fafc';
+  private currentFillColor = 'transparent';
+  private currentFillStyle: FillStyleOption = 'none';
+  private currentDashStyle: DashStyleOption = 'solid';
+  private currentSloppiness: SloppinessLevel = 'artist';
+  private currentSize = 3;
 
   private isDrawing = false;
+  private isPanning = false;
+  private isMovingAction = false;
+
+  private lastPanPoint: Point = { x: 0, y: 0 };
+  private selectedAction: DrawingAction | null = null;
+  private moveStartPoint: Point = { x: 0, y: 0 };
+
   private currentActionId: string | null = null;
   private currentPoints: Point[] = [];
 
   private currentUser: { id: string; name: string; color: string } | null = null;
   private currentRoom = 'default';
+  private currentGridStyle: 'dots' | 'mesh' | 'none' = 'dots';
+  private currentTheme: 'dark' | 'light' = 'dark';
 
   private lastCursorSend = 0;
+  private isSpacePressed = false;
 
   constructor() {
     this.metricsManager = new MetricsManager();
-    this.cursorManager = new CursorManager();
     this.historyManager = new HistoryManager();
-    this.canvasManager = new CanvasManager('main-canvas', 'overlay-canvas');
+
+    this.viewportManager = new ViewportManager(() => {
+      this.updateZoomDisplay();
+      if (this.canvasManager) {
+        this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
+        this.canvasManager.redrawOverlay();
+      }
+      if (this.cursorManager) {
+        this.cursorManager.refreshAll();
+      }
+    });
+
+    this.cursorManager = new CursorManager(this.viewportManager);
+    this.canvasManager = new CanvasManager('main-canvas', 'overlay-canvas', this.viewportManager);
 
     this.wsClient = new WebSocketClient((rtt) => {
       this.metricsManager.updatePing(rtt);
@@ -42,7 +71,6 @@ class App {
   }
 
   private initUI(): void {
-    // Room selection & URL param sync
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
@@ -53,65 +81,117 @@ class App {
       roomInput.value = this.currentRoom;
     }
 
-    const joinRoomBtn = document.getElementById('join-room-btn');
-    if (joinRoomBtn) {
-      joinRoomBtn.addEventListener('click', () => {
-        const newRoom = roomInput.value.trim() || 'default';
-        this.switchRoom(newRoom);
-      });
-    }
+    document.getElementById('join-room-btn')?.addEventListener('click', () => {
+      const newRoom = roomInput.value.trim() || 'default';
+      this.switchRoom(newRoom);
+    });
 
-    const shareBtn = document.getElementById('share-room-btn');
-    if (shareBtn) {
-      shareBtn.addEventListener('click', () => {
-        const shareUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(this.currentRoom)}`;
-        navigator.clipboard.writeText(shareUrl);
-        alert(`Room link copied to clipboard:\n${shareUrl}`);
-      });
-    }
+    document.getElementById('share-room-btn')?.addEventListener('click', () => {
+      const shareUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(this.currentRoom)}`;
+      navigator.clipboard.writeText(shareUrl);
+      alert(`Room share link copied to clipboard:\n${shareUrl}`);
+    });
 
-    // Tool selectors
+    // Tool Buttons
     const toolBtns = document.querySelectorAll('.tool-btn');
     toolBtns.forEach((btn) => {
       btn.addEventListener('click', (e) => {
         toolBtns.forEach((b) => b.classList.remove('active'));
         const target = e.currentTarget as HTMLElement;
         target.classList.add('active');
-        this.currentTool = (target.dataset.tool as ToolType) || 'brush';
+        this.selectTool((target.dataset.tool as ToolType) || 'brush');
       });
     });
 
-    // Color picker
-    const colorPicker = document.getElementById('color-picker') as HTMLInputElement;
-    if (colorPicker) {
-      colorPicker.addEventListener('input', (e) => {
+    // Color Swatches
+    const colorSwatches = document.querySelectorAll('.color-swatch');
+    const strokePicker = document.getElementById('stroke-color-picker') as HTMLInputElement;
+    colorSwatches.forEach((swatch) => {
+      swatch.addEventListener('click', (e) => {
+        colorSwatches.forEach((s) => s.classList.remove('active'));
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('active');
+        this.currentColor = target.dataset.color || '#f8fafc';
+        if (strokePicker) strokePicker.value = this.currentColor;
+      });
+    });
+
+    if (strokePicker) {
+      strokePicker.addEventListener('input', (e) => {
         this.currentColor = (e.target as HTMLInputElement).value;
-        this.updateActiveSwatch(this.currentColor);
       });
     }
 
-    // Color swatches
-    const swatches = document.querySelectorAll('.color-swatch');
-    swatches.forEach((swatch) => {
+    // Fill Swatches
+    const fillSwatches = document.querySelectorAll('.fill-swatch');
+    fillSwatches.forEach((swatch) => {
       swatch.addEventListener('click', (e) => {
+        fillSwatches.forEach((s) => s.classList.remove('active'));
         const target = e.currentTarget as HTMLElement;
-        const color = target.dataset.color || '#3B82F6';
-        this.currentColor = color;
-        if (colorPicker) colorPicker.value = color;
-        this.updateActiveSwatch(color);
+        target.classList.add('active');
+        this.currentFillColor = target.dataset.fill || 'transparent';
       });
     });
 
-    // Size slider
-    const sizeSlider = document.getElementById('size-slider') as HTMLInputElement;
-    const sizeValue = document.getElementById('size-value');
-    if (sizeSlider && sizeValue) {
-      sizeSlider.addEventListener('input', (e) => {
+    // Segmented Controls (Fill Style, Sloppiness, Dash Style)
+    this.bindSegmentedControl('data-fill-style', (val) => {
+      this.currentFillStyle = val as FillStyleOption;
+    });
+
+    this.bindSegmentedControl('data-sloppiness', (val) => {
+      this.currentSloppiness = val as SloppinessLevel;
+    });
+
+    this.bindSegmentedControl('data-dash', (val) => {
+      this.currentDashStyle = val as DashStyleOption;
+    });
+
+    // Stroke width slider
+    const strokeSlider = document.getElementById('stroke-width-slider') as HTMLInputElement;
+    const strokeVal = document.getElementById('stroke-width-val');
+    if (strokeSlider && strokeVal) {
+      strokeSlider.addEventListener('input', (e) => {
         const val = parseInt((e.target as HTMLInputElement).value, 10);
         this.currentSize = val;
-        sizeValue.textContent = `${val}px`;
+        strokeVal.textContent = `${val}px`;
       });
     }
+
+    // Zoom Controls
+    document.getElementById('zoom-in-btn')?.addEventListener('click', () => {
+      const center = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      this.viewportManager.zoomAtPoint(center.x, center.y, 1.2);
+    });
+
+    document.getElementById('zoom-out-btn')?.addEventListener('click', () => {
+      const center = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      this.viewportManager.zoomAtPoint(center.x, center.y, 0.8);
+    });
+
+    document.getElementById('zoom-reset-btn')?.addEventListener('click', () => {
+      this.viewportManager.resetView();
+    });
+
+    // Grid & Theme Toggles
+    const gridBtn = document.getElementById('grid-toggle-btn');
+    gridBtn?.addEventListener('click', () => {
+      if (this.currentGridStyle === 'dots') this.currentGridStyle = 'mesh';
+      else if (this.currentGridStyle === 'mesh') this.currentGridStyle = 'none';
+      else this.currentGridStyle = 'dots';
+
+      gridBtn.textContent = `Grid: ${this.currentGridStyle.charAt(0).toUpperCase() + this.currentGridStyle.slice(1)}`;
+      this.canvasManager.setGridStyle(this.currentGridStyle);
+      this.canvasManager.redrawOverlay();
+    });
+
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    themeBtn?.addEventListener('click', () => {
+      this.currentTheme = this.currentTheme === 'dark' ? 'light' : 'dark';
+      document.body.className = `${this.currentTheme}-theme`;
+      themeBtn.textContent = this.currentTheme === 'dark' ? '🌙 Dark' : '☀️ Light';
+      this.canvasManager.setTheme(this.currentTheme);
+      this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
+    });
 
     // Action buttons
     document.getElementById('undo-btn')?.addEventListener('click', () => this.undo());
@@ -120,15 +200,37 @@ class App {
     document.getElementById('save-btn')?.addEventListener('click', () => this.canvasManager.exportPNG());
   }
 
-  private updateActiveSwatch(color: string): void {
-    const swatches = document.querySelectorAll('.color-swatch');
-    swatches.forEach((swatch) => {
-      const el = swatch as HTMLElement;
-      if (el.dataset.color?.toLowerCase() === color.toLowerCase()) {
-        el.classList.add('active');
-      } else {
-        el.classList.remove('active');
-      }
+  private bindSegmentedControl(attribute: string, onChange: (val: string) => void): void {
+    const buttons = document.querySelectorAll(`[${attribute}]`);
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        buttons.forEach((b) => b.classList.remove('active'));
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('active');
+        const val = target.getAttribute(attribute);
+        if (val) onChange(val);
+      });
+    });
+  }
+
+  private updateZoomDisplay(): void {
+    const zoomVal = document.getElementById('zoom-val');
+    if (zoomVal) {
+      zoomVal.textContent = `${Math.round(this.viewportManager.getZoom() * 100)}%`;
+    }
+  }
+
+  private selectTool(tool: ToolType): void {
+    this.currentTool = tool;
+    if (tool !== 'select') {
+      this.selectedAction = null;
+      this.canvasManager.renderActions(this.historyManager.getActiveActions(), null);
+    }
+    const toolBtns = document.querySelectorAll('.tool-btn');
+    toolBtns.forEach((btn) => {
+      const el = btn as HTMLElement;
+      if (el.dataset.tool === tool) el.classList.add('active');
+      else el.classList.remove('active');
     });
   }
 
@@ -152,10 +254,9 @@ class App {
       switch (data.type) {
         case 'INIT_STATE':
           this.currentUser = data.user;
-          this.updateUserBadge(data.user);
-          this.updateOnlineUsers(data.onlineUsers);
           this.historyManager.setActions(data.actions);
-          this.canvasManager.renderActions(this.historyManager.getActiveActions());
+          this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
+          this.updateOnlineUsers(data.onlineUsers);
           break;
 
         case 'USER_JOINED':
@@ -183,8 +284,14 @@ class App {
             userId: data.userId,
             tool: data.tool,
             color: data.color,
+            fillColor: data.fillColor,
+            fillStyle: data.fillStyle,
+            dashStyle: data.dashStyle,
+            sloppiness: data.sloppiness,
             strokeWidth: data.strokeWidth,
-            points: [data.point]
+            points: [data.point],
+            text: data.text,
+            noteColor: data.noteColor
           });
           break;
 
@@ -195,52 +302,32 @@ class App {
         case 'DRAW_END':
           this.canvasManager.endRemoteStroke(data.action.id);
           this.historyManager.addAction(data.action);
-          this.canvasManager.renderActionOnMain(data.action);
+          this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
           break;
 
         case 'STATE_MUTATED':
           this.historyManager.setActions(data.actions);
-          this.canvasManager.renderActions(this.historyManager.getActiveActions());
+          this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
           break;
       }
     });
   }
 
-  private updateUserBadge(user: { name: string; color: string }): void {
-    const nameEl = document.getElementById('user-name');
-    const avatarEl = document.getElementById('user-avatar');
-    if (nameEl) nameEl.textContent = `${user.name} (You)`;
-    if (avatarEl) avatarEl.style.backgroundColor = user.color;
-  }
-
   private updateOnlineUsers(users: Array<{ id: string; name: string; color: string }>): void {
     const listEl = document.getElementById('online-users-list');
-    const countEl = document.getElementById('online-count');
-
-    if (countEl) countEl.textContent = `${users.length} online`;
-
     if (listEl) {
       listEl.innerHTML = '';
       users.slice(0, 5).forEach((u) => {
         const badge = document.createElement('div');
-        badge.className = 'online-avatar-badge';
+        badge.className = 'color-swatch';
         badge.style.backgroundColor = u.color;
-        badge.textContent = u.name.charAt(0).toUpperCase();
         badge.title = u.name;
         listEl.appendChild(badge);
       });
-
-      if (users.length > 5) {
-        const extra = document.createElement('div');
-        extra.className = 'online-avatar-badge';
-        extra.style.backgroundColor = '#475569';
-        extra.textContent = `+${users.length - 5}`;
-        listEl.appendChild(extra);
-      }
     }
   }
 
-  private getCanvasPoint(e: MouseEvent | Touch): Point {
+  private getScreenPoint(e: MouseEvent | Touch): Point {
     const canvas = document.getElementById('overlay-canvas') as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
     return {
@@ -252,31 +339,124 @@ class App {
   private initCanvasEvents(): void {
     const overlay = document.getElementById('overlay-canvas') as HTMLCanvasElement;
 
-    // Mouse events
-    overlay.addEventListener('mousedown', (e) => this.handleStart(this.getCanvasPoint(e)));
-    overlay.addEventListener('mousemove', (e) => {
-      const point = this.getCanvasPoint(e);
-      this.handleMove(point);
-      this.sendCursorPosition(point);
+    // Zoom on Wheel
+    overlay.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        this.viewportManager.zoomAtPoint(e.clientX, e.clientY, factor);
+      },
+      { passive: false }
+    );
+
+    // Pointer events for drawing & panning
+    overlay.addEventListener('mousedown', (e) => {
+      const screenPt = this.getScreenPoint(e);
+      const worldPt = this.viewportManager.screenToWorld(screenPt.x, screenPt.y);
+
+      // Pan canvas if Middle click, Hand tool, or Space pressed
+      if (e.button === 1 || this.currentTool === 'hand' || this.isSpacePressed) {
+        this.isPanning = true;
+        this.lastPanPoint = { x: e.clientX, y: e.clientY };
+        overlay.style.cursor = 'grabbing';
+        return;
+      }
+
+      // Selection / Move tool
+      if (this.currentTool === 'select') {
+        const hitAction = this.canvasManager.findActionAtPoint(this.historyManager.getActiveActions(), worldPt);
+        if (hitAction) {
+          this.selectedAction = hitAction;
+          this.isMovingAction = true;
+          this.moveStartPoint = worldPt;
+          this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction.id);
+        } else {
+          this.selectedAction = null;
+          this.canvasManager.renderActions(this.historyManager.getActiveActions(), null);
+        }
+        return;
+      }
+
+      this.handleStart(worldPt);
     });
+
+    overlay.addEventListener('mousemove', (e) => {
+      const screenPt = this.getScreenPoint(e);
+      const worldPt = this.viewportManager.screenToWorld(screenPt.x, screenPt.y);
+
+      // Handle Viewport Pan
+      if (this.isPanning) {
+        const deltaX = e.clientX - this.lastPanPoint.x;
+        const deltaY = e.clientY - this.lastPanPoint.y;
+        this.viewportManager.panBy(deltaX, deltaY);
+        this.lastPanPoint = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      // Handle Action Move
+      if (this.isMovingAction && this.selectedAction) {
+        const deltaX = worldPt.x - this.moveStartPoint.x;
+        const deltaY = worldPt.y - this.moveStartPoint.y;
+        this.moveStartPoint = worldPt;
+
+        this.selectedAction.points = this.selectedAction.points.map((p) => ({
+          x: p.x + deltaX,
+          y: p.y + deltaY
+        }));
+
+        this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction.id);
+
+        this.wsClient.send({
+          type: 'MOVE_ACTION',
+          actionId: this.selectedAction.id,
+          deltaX,
+          deltaY
+        });
+        return;
+      }
+
+      // Send cursor position in world space
+      this.sendCursorPosition(worldPt);
+
+      if (this.isDrawing) {
+        this.handleMove(worldPt);
+      }
+    });
+
     overlay.addEventListener('mouseup', () => this.handleEnd());
     overlay.addEventListener('mouseleave', () => this.handleEnd());
 
-    // Touch events for mobile support
+    // Touch support for mobile devices
     overlay.addEventListener('touchstart', (e) => {
       if (e.touches.length === 1) {
-        e.preventDefault();
-        this.handleStart(this.getCanvasPoint(e.touches[0]));
+        const screenPt = this.getScreenPoint(e.touches[0]);
+        const worldPt = this.viewportManager.screenToWorld(screenPt.x, screenPt.y);
+        if (this.currentTool === 'hand') {
+          this.isPanning = true;
+          this.lastPanPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else {
+          this.handleStart(worldPt);
+        }
       }
     });
+
     overlay.addEventListener('touchmove', (e) => {
       if (e.touches.length === 1) {
-        e.preventDefault();
-        const point = this.getCanvasPoint(e.touches[0]);
-        this.handleMove(point);
-        this.sendCursorPosition(point);
+        const screenPt = this.getScreenPoint(e.touches[0]);
+        const worldPt = this.viewportManager.screenToWorld(screenPt.x, screenPt.y);
+        if (this.isPanning) {
+          const deltaX = e.touches[0].clientX - this.lastPanPoint.x;
+          const deltaY = e.touches[0].clientY - this.lastPanPoint.y;
+          this.viewportManager.panBy(deltaX, deltaY);
+          this.lastPanPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (this.isDrawing) {
+          this.handleMove(worldPt);
+          this.sendCursorPosition(worldPt);
+        }
       }
     });
+
     overlay.addEventListener('touchend', () => this.handleEnd());
   }
 
@@ -294,34 +474,17 @@ class App {
 
   private handleStart(point: Point): void {
     if (this.currentTool === 'text') {
-      const text = prompt('Enter text to place on canvas:');
+      const text = prompt('Enter text for canvas:');
       if (text) {
-        const actionId = 'act_' + Math.random().toString(36).substring(2, 9);
-        const action: DrawingAction = {
-          id: actionId,
-          userId: this.currentUser?.id || 'local',
-          userName: this.currentUser?.name || 'Local',
-          userColor: this.currentUser?.color || '#3B82F6',
-          tool: 'text',
-          color: this.currentColor,
-          strokeWidth: this.currentSize,
-          points: [point],
-          text,
-          timestamp: Date.now(),
-          undone: false
-        };
+        this.createSinglePointAction('text', point, text);
+      }
+      return;
+    }
 
-        this.wsClient.send({
-          type: 'DRAW_END',
-          actionId,
-          tool: 'text',
-          color: this.currentColor,
-          strokeWidth: this.currentSize,
-          points: [point],
-          text
-        });
-
-        this.canvasManager.renderActionOnMain(action);
+    if (this.currentTool === 'sticky') {
+      const text = prompt('Enter sticky note text:');
+      if (text !== null) {
+        this.createSinglePointAction('sticky', point, text, '#fef08a');
       }
       return;
     }
@@ -335,11 +498,57 @@ class App {
       actionId: this.currentActionId,
       tool: this.currentTool,
       color: this.currentColor,
+      fillColor: this.currentFillColor,
+      fillStyle: this.currentFillStyle,
+      dashStyle: this.currentDashStyle,
+      sloppiness: this.currentSloppiness,
       strokeWidth: this.currentSize,
       point
     });
 
     this.updateOverlay();
+  }
+
+  private createSinglePointAction(tool: ToolType, point: Point, text: string, noteColor?: string): void {
+    const actionId = 'act_' + Math.random().toString(36).substring(2, 9);
+    const endPoint = tool === 'sticky' ? { x: point.x + 180, y: point.y + 180 } : point;
+
+    const action: DrawingAction = {
+      id: actionId,
+      userId: this.currentUser?.id || 'local',
+      userName: this.currentUser?.name || 'Local',
+      userColor: this.currentUser?.color || '#3b82f6',
+      tool,
+      color: this.currentColor,
+      fillColor: this.currentFillColor,
+      fillStyle: this.currentFillStyle,
+      dashStyle: this.currentDashStyle,
+      sloppiness: this.currentSloppiness,
+      strokeWidth: this.currentSize,
+      points: [point, endPoint],
+      text,
+      noteColor,
+      timestamp: Date.now(),
+      undone: false
+    };
+
+    this.wsClient.send({
+      type: 'DRAW_END',
+      actionId,
+      tool,
+      color: this.currentColor,
+      fillColor: this.currentFillColor,
+      fillStyle: this.currentFillStyle,
+      dashStyle: this.currentDashStyle,
+      sloppiness: this.currentSloppiness,
+      strokeWidth: this.currentSize,
+      points: [point, endPoint],
+      text,
+      noteColor
+    });
+
+    this.historyManager.addAction(action);
+    this.canvasManager.renderActions(this.historyManager.getActiveActions(), this.selectedAction?.id);
   }
 
   private handleMove(point: Point): void {
@@ -357,6 +566,12 @@ class App {
   }
 
   private handleEnd(): void {
+    const overlay = document.getElementById('overlay-canvas') as HTMLCanvasElement;
+    overlay.style.cursor = 'default';
+
+    this.isPanning = false;
+    this.isMovingAction = false;
+
     if (!this.isDrawing || !this.currentActionId) return;
 
     this.wsClient.send({
@@ -364,6 +579,10 @@ class App {
       actionId: this.currentActionId,
       tool: this.currentTool,
       color: this.currentColor,
+      fillColor: this.currentFillColor,
+      fillStyle: this.currentFillStyle,
+      dashStyle: this.currentDashStyle,
+      sloppiness: this.currentSloppiness,
       strokeWidth: this.currentSize,
       points: this.currentPoints
     });
@@ -381,6 +600,10 @@ class App {
         userId: this.currentUser?.id || 'local',
         tool: this.currentTool,
         color: this.currentColor,
+        fillColor: this.currentFillColor,
+        fillStyle: this.currentFillStyle,
+        dashStyle: this.currentDashStyle,
+        sloppiness: this.currentSloppiness,
         strokeWidth: this.currentSize,
         points: this.currentPoints
       };
@@ -406,44 +629,37 @@ class App {
 
   private initKeyboardShortcuts(): void {
     window.addEventListener('keydown', (e) => {
-      // Ignore if typing in input field
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      if (e.code === 'Space') {
+        this.isSpacePressed = true;
+        const overlay = document.getElementById('overlay-canvas') as HTMLCanvasElement;
+        overlay.style.cursor = 'grab';
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
-        if (e.shiftKey) {
-          this.redo();
-        } else {
-          this.undo();
-        }
+        if (e.shiftKey) this.redo();
+        else this.undo();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         this.redo();
-      } else if (e.key.toLowerCase() === 'b') {
-        this.selectTool('brush');
-      } else if (e.key.toLowerCase() === 'e') {
-        this.selectTool('eraser');
-      } else if (e.key.toLowerCase() === 'r') {
-        this.selectTool('rectangle');
-      } else if (e.key.toLowerCase() === 'c') {
-        this.selectTool('circle');
-      } else if (e.key.toLowerCase() === 'l') {
-        this.selectTool('line');
-      } else if (e.key.toLowerCase() === 't') {
-        this.selectTool('text');
-      }
+      } else if (e.key.toLowerCase() === 'v') this.selectTool('select');
+      else if (e.key.toLowerCase() === 'h') this.selectTool('hand');
+      else if (e.key.toLowerCase() === 'b') this.selectTool('brush');
+      else if (e.key.toLowerCase() === 'r') this.selectTool('rectangle');
+      else if (e.key.toLowerCase() === 'd') this.selectTool('diamond');
+      else if (e.key.toLowerCase() === 'c') this.selectTool('circle');
+      else if (e.key.toLowerCase() === 'a') this.selectTool('arrow');
+      else if (e.key.toLowerCase() === 'l') this.selectTool('line');
+      else if (e.key.toLowerCase() === 't') this.selectTool('text');
+      else if (e.key.toLowerCase() === 'n') this.selectTool('sticky');
+      else if (e.key.toLowerCase() === 'e') this.selectTool('eraser');
     });
-  }
 
-  private selectTool(tool: ToolType): void {
-    this.currentTool = tool;
-    const toolBtns = document.querySelectorAll('.tool-btn');
-    toolBtns.forEach((btn) => {
-      const el = btn as HTMLElement;
-      if (el.dataset.tool === tool) {
-        el.classList.add('active');
-      } else {
-        el.classList.remove('active');
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        this.isSpacePressed = false;
+        const overlay = document.getElementById('overlay-canvas') as HTMLCanvasElement;
+        overlay.style.cursor = 'default';
       }
     });
   }
@@ -457,7 +673,6 @@ class App {
   }
 }
 
-// Bootstrap application on DOM load
 window.addEventListener('DOMContentLoaded', () => {
   new App();
 });

@@ -10,16 +10,14 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 const roomManager = new RoomManager();
 
-// Serve static assets from both dist/client and client folders
 app.use('/dist/client', express.static(path.join(__dirname, '../client')));
 app.use(express.static(path.join(__dirname, '../../client')));
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Fallback to index.html for room routes
 app.get('*', (req, res) => {
   const clientPath = path.join(__dirname, '../../client/index.html');
   const distClientPath = path.join(__dirname, '../client/index.html');
-  
+
   if (require('fs').existsSync(clientPath)) {
     res.sendFile(clientPath);
   } else if (require('fs').existsSync(distClientPath)) {
@@ -34,9 +32,14 @@ interface ActiveStroke {
   userId: string;
   tool: any;
   color: string;
+  fillColor?: string;
+  fillStyle?: any;
+  dashStyle?: any;
+  sloppiness?: any;
   strokeWidth: number;
   points: Point[];
   text?: string;
+  noteColor?: string;
   timestamp: number;
 }
 
@@ -55,7 +58,6 @@ wss.on('connection', (ws: WebSocket) => {
         userSession = roomManager.createUserSession(ws, roomId, data.userName);
         const room = roomManager.getOrCreateRoom(roomId);
 
-        // Send initialization state to newly joined user
         ws.send(
           JSON.stringify({
             type: 'INIT_STATE',
@@ -70,7 +72,6 @@ wss.on('connection', (ws: WebSocket) => {
           })
         );
 
-        // Broadcast USER_JOINED to other users in room
         roomManager.broadcastToRoom(
           roomId,
           {
@@ -119,8 +120,14 @@ wss.on('connection', (ws: WebSocket) => {
             userId: userSession.id,
             tool: data.tool,
             color: data.color,
+            fillColor: data.fillColor,
+            fillStyle: data.fillStyle,
+            dashStyle: data.dashStyle,
+            sloppiness: data.sloppiness,
             strokeWidth: data.strokeWidth,
             points: [data.point],
+            text: data.text,
+            noteColor: data.noteColor,
             timestamp: Date.now()
           };
           activeStrokes.set(strokeId, stroke);
@@ -135,8 +142,14 @@ wss.on('connection', (ws: WebSocket) => {
               userColor: userSession.color,
               tool: data.tool,
               color: data.color,
+              fillColor: data.fillColor,
+              fillStyle: data.fillStyle,
+              dashStyle: data.dashStyle,
+              sloppiness: data.sloppiness,
               strokeWidth: data.strokeWidth,
-              point: data.point
+              point: data.point,
+              text: data.text,
+              noteColor: data.noteColor
             },
             userSession.id
           );
@@ -166,7 +179,7 @@ wss.on('connection', (ws: WebSocket) => {
         case 'DRAW_END': {
           const strokeId = data.actionId;
           const stroke = activeStrokes.get(strokeId);
-          
+
           const finalPoints = data.points || (stroke ? stroke.points : []);
           const finalAction: DrawingAction = {
             id: strokeId,
@@ -174,10 +187,15 @@ wss.on('connection', (ws: WebSocket) => {
             userName: userSession.name,
             userColor: userSession.color,
             tool: data.tool || (stroke ? stroke.tool : 'brush'),
-            color: data.color || (stroke ? stroke.color : '#000000'),
-            strokeWidth: data.strokeWidth || (stroke ? stroke.strokeWidth : 5),
+            color: data.color || (stroke ? stroke.color : '#1e293b'),
+            fillColor: data.fillColor || (stroke ? stroke.fillColor : 'transparent'),
+            fillStyle: data.fillStyle || (stroke ? stroke.fillStyle : 'none'),
+            dashStyle: data.dashStyle || (stroke ? stroke.dashStyle : 'solid'),
+            sloppiness: data.sloppiness || (stroke ? stroke.sloppiness : 'artist'),
+            strokeWidth: data.strokeWidth || (stroke ? stroke.strokeWidth : 3),
             points: finalPoints,
-            text: data.text,
+            text: data.text || (stroke ? stroke.text : undefined),
+            noteColor: data.noteColor || (stroke ? stroke.noteColor : undefined),
             timestamp: Date.now(),
             undone: false
           };
@@ -189,6 +207,19 @@ wss.on('connection', (ws: WebSocket) => {
             type: 'DRAW_END',
             action: finalAction
           });
+          break;
+        }
+
+        case 'MOVE_ACTION': {
+          const updated = room.state.updateActionPosition(data.actionId, data.deltaX, data.deltaY);
+          if (updated) {
+            roomManager.broadcastToRoom(roomId, {
+              type: 'STATE_MUTATED',
+              actionType: 'move',
+              mutatedBy: userSession.name,
+              actions: room.state.getActiveActions()
+            });
+          }
           break;
         }
 
@@ -251,7 +282,7 @@ wss.on('connection', (ws: WebSocket) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`=================================================`);
-  console.log(`🎨 Collaborative Canvas Server running on port ${PORT}`);
+  console.log(`🎨 Excalidraw-Style Collaborative Canvas Server running on port ${PORT}`);
   console.log(`👉 Open http://localhost:${PORT} in your browser`);
   console.log(`=================================================`);
 });
